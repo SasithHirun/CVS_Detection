@@ -14,25 +14,33 @@ app = Flask(__name__)
 # Check if the shape predictor file exists. If not, download it.
 if not os.path.isfile("shape_predictor_68_face_landmarks.dat"):
     print("Downloading shape_predictor_68_face_landmarks.dat.bz2...")
-    # Download the file using Python
     url = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
     urllib.request.urlretrieve(url, "shape_predictor_68_face_landmarks.dat.bz2")
-    
-    # Extract the bz2 file
     print("Extracting shape_predictor_68_face_landmarks.dat.bz2...")
     with bz2.BZ2File("shape_predictor_68_face_landmarks.dat.bz2") as file:
         with open("shape_predictor_68_face_landmarks.dat", "wb") as f_out:
             f_out.write(file.read())
 
-# Load the face detection and landmark predictor models
-face_detector = dlib.get_frontal_face_detector()  # Face detector
-landmark_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")  # Landmark model
+# Load face detection and landmark predictor models
+face_detector = dlib.get_frontal_face_detector()
+landmark_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 
 # Constants for thresholds
 EAR_THRESHOLD = 0.25  # Eye Aspect Ratio threshold
 FRAME_COUNT_THRESHOLD = 4  # Number of consecutive frames with low EAR to trigger tired state
-TIME_THRESHOLD = 10  # Time in seconds to trigger the popup
-POPUP_MESSAGE = "Warning! Eye strain detected. Please take a break."
+BLINK_DURATION = 1  # Minimum duration (seconds) for a blink to be counted
+TIME_THRESHOLD = 3  # Time in seconds to trigger the popup
+POPUP_MESSAGE = "Warning! Eye strain detected."
+
+# Variables for blink detection and popup trigger
+blink_count = 0
+last_blink_time = time.time()
+blinks_per_minute = 0
+blink_start_time = time.time()
+tired_state_detected = False
+frame_count = 0
+ear_below_threshold_start_time = None
+popup_triggered = False
 
 # Function to calculate the Eye Aspect Ratio (EAR)
 def calculate_ear(eye):
@@ -55,15 +63,10 @@ def preprocess_frame(frame):
     gray = cv2.GaussianBlur(gray, (5, 5), 0)  # Apply GaussianBlur to reduce noise
     return gray
 
-# Initialize webcam and frame processing variables
-cap = cv2.VideoCapture(0)
-tired_state_detected = False
-frame_count = 0
-ear_below_threshold_start_time = None
-popup_triggered = False
-
 def generate_frames():
-    global tired_state_detected, frame_count, ear_below_threshold_start_time, popup_triggered
+    global blink_count, last_blink_time, blinks_per_minute, blink_start_time, tired_state_detected, frame_count, ear_below_threshold_start_time, popup_triggered
+    cap = cv2.VideoCapture(0)
+
     while cap.isOpened():
         ret, frame = cap.read()
 
@@ -76,6 +79,7 @@ def generate_frames():
         # Detect faces in the frame
         faces = face_detector(gray)
         avg_ear = 0  # Initialize EAR for display
+
         for face in faces:
             landmarks = landmark_predictor(gray, face)
 
@@ -87,6 +91,12 @@ def generate_frames():
             left_ear = calculate_ear(left_eye)
             right_ear = calculate_ear(right_eye)
             avg_ear = (left_ear + right_ear) / 2.0
+
+            # Blink Detection
+            if avg_ear < EAR_THRESHOLD:
+                if time.time() - last_blink_time >= BLINK_DURATION:
+                    blink_count += 1
+                    last_blink_time = time.time()
 
             # Check for tiredness
             if avg_ear < EAR_THRESHOLD:
@@ -112,14 +122,24 @@ def generate_frames():
                 cv2.putText(frame, "Alert", (face.left(), face.top() - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-            # Display the current EAR value
-            cv2.putText(frame, f"EAR: {avg_ear:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            # Display EAR value and blinking frequency
+            cv2.putText(frame, f"EAR: {avg_ear:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
             # Draw landmarks
             for (x, y) in left_eye:
                 cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             for (x, y) in right_eye:
                 cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+
+        # Calculate blinks per minute
+        elapsed_time = time.time() - blink_start_time
+        if elapsed_time >= 60:
+            blinks_per_minute = blink_count
+            blink_count = 0
+            blink_start_time = time.time()
+
+        # Display blinking frequency
+        cv2.putText(frame, f"Blinks/min: {blinks_per_minute}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
         # Convert the frame to a JPEG format for streaming
         ret, buffer = cv2.imencode('.jpg', frame)
