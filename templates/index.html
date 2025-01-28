@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Strain Detection</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        .video-container {
+            margin-bottom: 20px;
+        }
+        #status {
+            font-size: 1.5em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Eye Strain Detection</h1>
+    <div class="video-container">
+        <img id="video-feed" src="{{ url_for('video') }}" />
+    </div>
+    <div id="status">
+        <p>Monitoring for eye strain...</p>
+    </div>
+    <script>
+        const statusDiv = document.getElementById('status');
+        let tiredState = false;
+
+        // Check for the tired state by observing frame changes from the backend
+        function updateStatus(isTired) {
+            if (isTired && !tiredState) {
+                statusDiv.innerHTML = "<p style='color:red;'>Tired! Please take a break!</p>";
+                tiredState = true;
+            } else if (!isTired && tiredState) {
+                statusDiv.innerHTML = "<p style='color:green;'>You are alert and active!</p>";
+                tiredState = false;
+            }
+        }
+
+        // Simulate a tired state detection
+        setInterval(() => {
+            updateStatus(tiredState);
+        }, 1000); // Update every second
+    </script>
+</body>
+</html>
