@@ -5,51 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eye Strain Detection</title>
     <style>
-        body {
-            text-align: center;
+          body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            margin: 0;
+        }
+
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ccc;
             padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
         }
-        h1 {
-            margin-bottom: 20px;
+
+        #popup button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
-        .video-container {
-            margin-bottom: 20px;
+
+        #popup button:hover {
+            background: #0056b3;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
         }
         #status {
             font-size: 1.5em;
             color: #333;
         }
+
     </style>
 </head>
 <body>
     <h1>Eye Strain Detection</h1>
-    <div class="video-container">
-        <img id="video-feed" src="{{ url_for('video') }}" />
+    <div id="video-container">
+        <img src="/video" alt="Video Stream">
     </div>
+
     <div id="status">
         <p>Monitoring for eye strain...</p>
     </div>
-    <script>
-        const statusDiv = document.getElementById('status');
-        let tiredState = false;
 
-        // Check for the tired state by observing frame changes from the backend
-        function updateStatus(isTired) {
-            if (isTired && !tiredState) {
-                statusDiv.innerHTML = "<p style='color:red;'>Tired! Please take a break!</p>";
-                tiredState = true;
-            } else if (!isTired && tiredState) {
-                statusDiv.innerHTML = "<p style='color:green;'>You are alert and active!</p>";
-                tiredState = false;
+
+    <div id="overlay"></div>
+    <div id="popup">
+        <p>Warning! Eye strain detected. Please take a break.</p>
+        <button onclick="closePopup()">Close</button>
+    </div>
+
+    <script>
+        const popup = document.getElementById('popup');
+        const overlay = document.getElementById('overlay');
+
+        function closePopup() {
+            popup.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        async function checkPopup() {
+            const response = await fetch('/check_popup');
+            const data = await response.json();
+            if (data.show_popup) {
+                popup.style.display = 'block';
+                overlay.style.display = 'block';
             }
         }
 
-        // Simulate a tired state detection
-        setInterval(() => {
-            updateStatus(tiredState);
-        }, 1000); // Update every second
+        setInterval(checkPopup, 1000); // Check every second
     </script>
 </body>
 </html>

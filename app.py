@@ -6,7 +6,7 @@ import os
 import time
 import urllib.request
 import bz2
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -31,6 +31,8 @@ landmark_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat
 # Constants for thresholds
 EAR_THRESHOLD = 0.25  # Eye Aspect Ratio threshold
 FRAME_COUNT_THRESHOLD = 4  # Number of consecutive frames with low EAR to trigger tired state
+TIME_THRESHOLD = 10  # Time in seconds to trigger the popup
+POPUP_MESSAGE = "Warning! Eye strain detected. Please take a break."
 
 # Function to calculate the Eye Aspect Ratio (EAR)
 def calculate_ear(eye):
@@ -53,13 +55,15 @@ def preprocess_frame(frame):
     gray = cv2.GaussianBlur(gray, (5, 5), 0)  # Apply GaussianBlur to reduce noise
     return gray
 
-# Initialize webcam and frame processing flag
+# Initialize webcam and frame processing variables
 cap = cv2.VideoCapture(0)
 tired_state_detected = False
 frame_count = 0
+ear_below_threshold_start_time = None
+popup_triggered = False
 
 def generate_frames():
-    global tired_state_detected, frame_count
+    global tired_state_detected, frame_count, ear_below_threshold_start_time, popup_triggered
     while cap.isOpened():
         ret, frame = cap.read()
 
@@ -71,6 +75,7 @@ def generate_frames():
 
         # Detect faces in the frame
         faces = face_detector(gray)
+        avg_ear = 0  # Initialize EAR for display
         for face in faces:
             landmarks = landmark_predictor(gray, face)
 
@@ -85,15 +90,30 @@ def generate_frames():
 
             # Check for tiredness
             if avg_ear < EAR_THRESHOLD:
+                if ear_below_threshold_start_time is None:
+                    ear_below_threshold_start_time = time.time()
+                elapsed_time = time.time() - ear_below_threshold_start_time
+
+                if elapsed_time >= TIME_THRESHOLD:
+                    popup_triggered = True  # Trigger popup
+                    cv2.putText(frame, POPUP_MESSAGE, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
                 frame_count += 1
                 if frame_count >= FRAME_COUNT_THRESHOLD:
                     cv2.putText(frame, "Tired (Eyes Closed)", (face.left(), face.top() - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                     tired_state_detected = True
             else:
+                # Reset EAR below threshold time when the user is alert
+                ear_below_threshold_start_time = None
+                frame_count = 0
+                popup_triggered = False  # Reset popup state
+
                 cv2.putText(frame, "Alert", (face.left(), face.top() - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                frame_count = 0
+
+            # Display the current EAR value
+            cv2.putText(frame, f"EAR: {avg_ear:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
             # Draw landmarks
             for (x, y) in left_eye:
@@ -109,15 +129,18 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
-# Route to serve the main page
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Route to stream the video feed
 @app.route('/video')
 def video():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/check_popup')
+def check_popup():
+    global popup_triggered
+    return jsonify({"show_popup": popup_triggered})
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
