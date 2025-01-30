@@ -5,15 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eye Strain Detection</title>
     <style>
-          body {
+        body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             text-align: center;
             margin: 0;
+            background: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            color: #007bff;
+        }
+
+        #video-container {
+            margin: 20px 0;
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #status, #screen-time {
+            font-size: 1.5em;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #e9ecef;
+            width: 80%;
+            max-width: 500px;
+            transition: background 0.5s ease-in-out, color 0.5s ease-in-out;
+        }
+
+        .normal {
+            background: #d4edda; /* Green */
+            color: #155724;
+        }
+
+        .tired {
+            background: #f8d7da; /* Red */
+            color: #721c24;
         }
 
         #popup {
@@ -28,16 +65,18 @@
             padding: 20px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             text-align: center;
+            border-radius: 10px;
         }
 
         #popup button {
             margin-top: 10px;
-            padding: 5px 10px;
+            padding: 10px 20px;
             background: #007bff;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 1em;
         }
 
         #popup button:hover {
@@ -54,23 +93,22 @@
             background: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
-        #status {
-            font-size: 1.5em;
-            color: #333;
-        }
-
     </style>
 </head>
 <body>
     <h1>Eye Strain Detection</h1>
     <div id="video-container">
-        <img src="/video" alt="Video Stream">
+        <img src="/video" alt="Video Stream" id="video-feed">
+        <div class="loading" id="loading">Loading video feed...</div>
     </div>
 
-    <div id="status">
+    <div id="status" class="normal">
         <p>Monitoring for eye strain...</p>
     </div>
 
+    <div id="screen-time">
+        <p>Screen Time: <span id="screen-time-value">0</span> min</p>
+    </div>
 
     <div id="overlay"></div>
     <div id="popup">
@@ -81,6 +119,10 @@
     <script>
         const popup = document.getElementById('popup');
         const overlay = document.getElementById('overlay');
+        const statusDiv = document.getElementById('status');
+        const screenTimeValue = document.getElementById('screen-time-value');
+        const videoFeed = document.getElementById('video-feed');
+        const loadingDiv = document.getElementById('loading');
 
         function closePopup() {
             popup.style.display = 'none';
@@ -88,15 +130,53 @@
         }
 
         async function checkPopup() {
-            const response = await fetch('/check_popup');
-            const data = await response.json();
-            if (data.show_popup) {
-                popup.style.display = 'block';
-                overlay.style.display = 'block';
+            try {
+                const response = await fetch('/check_popup');
+                const data = await response.json();
+                if (data.show_popup) {
+                    popup.style.display = 'block';
+                    overlay.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching popup status:', error);
             }
         }
 
-        setInterval(checkPopup, 1000); // Check every second
+        async function updateStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                statusDiv.textContent = `EAR: ${data.ear.toFixed(2)} | Blinks/min: ${data.blinksPerMinute}`;
+                statusDiv.className = data.ear < 0.25 ? 'tired' : 'normal';
+            } catch (error) {
+                console.error('Error fetching status:', error);
+            }
+        }
+
+        async function updateScreenTime() {
+            try {
+                const response = await fetch('/screen_time');
+                const data = await response.json();
+                screenTimeValue.textContent = data.minutes;
+
+                // If screen time exceeds 30 minutes, display a popup message
+                if (data.minutes >= 30) {
+                    popup.querySelector("p").textContent = "You have been using the screen for 30 minutes. Consider taking a break!";
+                    popup.style.display = 'block';
+                    overlay.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching screen time:', error);
+            }
+        }
+
+        videoFeed.onload = () => {
+            loadingDiv.style.display = 'none';
+        };
+
+        setInterval(checkPopup, 1000);
+        setInterval(updateStatus, 1000);
+        setInterval(updateScreenTime, 60000);
     </script>
 </body>
 </html>

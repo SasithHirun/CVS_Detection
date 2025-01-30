@@ -41,6 +41,8 @@ tired_state_detected = False
 frame_count = 0
 ear_below_threshold_start_time = None
 popup_triggered = False
+avg_ear = 0  # Global variable to store the average EAR
+screen_start_time = time.time()  # Start time for screen time tracking
 
 # Function to calculate the Eye Aspect Ratio (EAR)
 def calculate_ear(eye):
@@ -64,7 +66,7 @@ def preprocess_frame(frame):
     return gray
 
 def generate_frames():
-    global blink_count, last_blink_time, blinks_per_minute, blink_start_time, tired_state_detected, frame_count, ear_below_threshold_start_time, popup_triggered
+    global blink_count, last_blink_time, blinks_per_minute, blink_start_time, tired_state_detected, frame_count, ear_below_threshold_start_time, popup_triggered, avg_ear
     cap = cv2.VideoCapture(0)
 
     while cap.isOpened():
@@ -78,7 +80,6 @@ def generate_frames():
 
         # Detect faces in the frame
         faces = face_detector(gray)
-        avg_ear = 0  # Initialize EAR for display
 
         for face in faces:
             landmarks = landmark_predictor(gray, face)
@@ -149,6 +150,7 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
+# Flask routes
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -161,6 +163,21 @@ def video():
 def check_popup():
     global popup_triggered
     return jsonify({"show_popup": popup_triggered})
+
+@app.route('/status')
+def status():
+    global avg_ear, blinks_per_minute, tired_state_detected
+    return jsonify({
+        "ear": avg_ear,
+        "blinksPerMinute": blinks_per_minute,
+        "status": "tired" if tired_state_detected else "alert"
+    })
+
+@app.route('/screen_time')
+def screen_time():
+    elapsed_time = int(time.time() - screen_start_time)
+    minutes = elapsed_time // 60
+    return jsonify({"minutes": minutes, "seconds": elapsed_time % 60})
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
