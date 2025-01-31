@@ -1,56 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eye Strain Detection</title>
+    <title>Eye Strain Detection Dashboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f4f4f9;
+            color: #333;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            text-align: center;
-            margin: 0;
-            background: #f4f4f9;
-            color: #333;
         }
 
         h1 {
-            margin-bottom: 20px;
             font-size: 2.5em;
             color: #007bff;
+            margin-bottom: 20px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         #video-container {
-            margin: 20px 0;
-            border: 2px solid #007bff;
+            grid-column: span 2;
+            text-align: center;
+        }
+
+        #video-feed {
             border-radius: 10px;
-            overflow: hidden;
+            max-width: 100%;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
-        #status, #screen-time {
-            font-size: 1.5em;
-            margin: 20px 0;
-            padding: 10px;
-            border-radius: 5px;
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            background: rgba(0, 0, 0, 0.7);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .metric {
             background: #e9ecef;
-            width: 80%;
-            max-width: 500px;
-            transition: background 0.5s ease-in-out, color 0.5s ease-in-out;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
         }
 
-        .normal {
-            background: #d4edda; /* Green */
-            color: #155724;
+        .metric h3 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #007bff;
         }
 
-        .tired {
-            background: #f8d7da; /* Red */
-            color: #721c24;
+        .metric p {
+            margin: 5px 0 0;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .controls button:hover {
+            background: #0056b3;
         }
 
         #popup {
@@ -95,31 +173,62 @@
         }
     </style>
 </head>
+
 <body>
-    <h1>Eye Strain Detection</h1>
-    <div id="video-container">
-        <img src="/video" alt="Video Stream" id="video-feed">
-        <div class="loading" id="loading">Loading video feed...</div>
+    <h1>Eye Strain Detection Dashboard</h1>
+    <!-- <img src="{{ url_for('static', filename='images/DSC01837.jpg') }}" alt="Image" style="width:100%; border-radius: 10px; margin-top: 10px;"> -->
+
+
+
+    <div class="dashboard">
+        <!-- Video Feed -->
+        <div id="video-container" class="card">
+            <img src="/video" alt="Video Stream" id="video-feed" onload="hideLoading()" onerror="showLoading()">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                Loading video feed...
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics card">
+            <div class="metric">
+                <h3>Eye Aspect Ratio (EAR)</h3>
+                <p id="ear-value">0.00</p>
+            </div>
+            <div class="metric">
+                <h3>Blinks per Minute</h3>
+                <p id="blink-rate">0</p>
+            </div>
+            <div class="metric">
+                <h3>Screen Time</h3>
+                <p id="screen-time-value">0 min</p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls card">
+            <button onclick="resetScreenTime()">Reset Screen Time</button>
+            <button onclick="toggleMonitoring()">Stop Monitoring</button>
+            <button onclick="resetScreenTime()">Data Visualizasion</button>
+            <button onclick="toggleMonitoring()">Stop Monitoring</button>
+            
+        </div>
     </div>
 
-    <div id="status" class="normal">
-        <p>Monitoring for eye strain...</p>
-    </div>
-
-    <div id="screen-time">
-        <p>Screen Time: <span id="screen-time-value">0</span> min</p>
-    </div>
-
+    <!-- Popup -->
     <div id="overlay"></div>
     <div id="popup">
         <p>Warning! Eye strain detected. Please take a break.</p>
         <button onclick="closePopup()">Close</button>
+        <button onclick="closePopup()">Get a Break</button>
     </div>
 
     <script>
         const popup = document.getElementById('popup');
         const overlay = document.getElementById('overlay');
-        const statusDiv = document.getElementById('status');
+        const earValue = document.getElementById('ear-value');
+        const blinkRate = document.getElementById('blink-rate');
         const screenTimeValue = document.getElementById('screen-time-value');
         const videoFeed = document.getElementById('video-feed');
         const loadingDiv = document.getElementById('loading');
@@ -127,6 +236,24 @@
         function closePopup() {
             popup.style.display = 'none';
             overlay.style.display = 'none';
+        }
+
+        async function resetScreenTime() {
+            try {
+                const response = await fetch('/reset_screen_time', { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    screenTimeValue.textContent = 0;
+                    closePopup();
+                }
+            } catch (error) {
+                console.error('Error resetting screen time:', error);
+            }
+        }
+
+        async function toggleMonitoring() {
+            // Implement start/stop monitoring logic here
+            alert("Monitoring toggled!");
         }
 
         async function checkPopup() {
@@ -146,29 +273,41 @@
             try {
                 const response = await fetch('/status');
                 const data = await response.json();
-                statusDiv.textContent = `EAR: ${data.ear.toFixed(2)} | Blinks/min: ${data.blinksPerMinute}`;
-                statusDiv.className = data.ear < 0.25 ? 'tired' : 'normal';
+                earValue.textContent = data.ear.toFixed(2);
+                blinkRate.textContent = data.blinksPerMinute;
             } catch (error) {
                 console.error('Error fetching status:', error);
             }
         }
 
-        async function updateScreenTime() {
-            try {
-                const response = await fetch('/screen_time');
-                const data = await response.json();
-                screenTimeValue.textContent = data.minutes;
-
-                // If screen time exceeds 30 minutes, display a popup message
-                if (data.minutes >= 30) {
-                    popup.querySelector("p").textContent = "You have been using the screen for 30 minutes. Consider taking a break!";
-                    popup.style.display = 'block';
-                    overlay.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Error fetching screen time:', error);
-            }
+        function hideLoading() {
+            loadingDiv.style.display = "none";
         }
+
+        function showLoading() {
+            loadingDiv.style.display = "flex";
+        }
+
+        async function updateScreenTime() {
+    try {
+        const response = await fetch('/screen_time');
+        const data = await response.json();
+        screenTimeValue.textContent = data.minutes;
+
+        if (data.minutes >= 2) {
+            popup.innerHTML = `
+                <p>You have been using the screen for 20 minutes. Consider taking a break!</p>
+                <img src="{{ url_for('static', filename='images/20.jpg') }}" alt="Image" style="width:100%; border-radius: 10px; margin-top: 10px;">
+                <button onclick="closePopup()">Close</button>
+            `;
+            popup.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error fetching screen time:', error);
+    }
+}
+
 
         videoFeed.onload = () => {
             loadingDiv.style.display = 'none';
@@ -179,4 +318,5 @@
         setInterval(updateScreenTime, 60000);
     </script>
 </body>
+
 </html>
