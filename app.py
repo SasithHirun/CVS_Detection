@@ -179,5 +179,31 @@ def screen_time():
     minutes = elapsed_time // 60
     return jsonify({"minutes": minutes, "seconds": elapsed_time % 60})
 
+@app.route('/')
+def home():
+    if 'points' not in session:
+        session['points'] = 0  # Set points to 0 if not initialized
+    return render_template('index.html')
+
+# Route to add points (simulating earning points after the timer)
+@app.route('/add_points', methods=['POST'])
+def add_points():
+    session['points'] += 10  # Add 10 points (you can customize this)
+    return jsonify({'message': 'Points added successfully!'})
+
+# Route to get total points
+@app.route('/get_points')
+def get_points():
+    total_points = session.get('points', 0)
+    return jsonify({'totalPoints': total_points})
+
+# Account page route
+@app.route('/account')
+def account():
+    return render_template('account.html')
+
+
+
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

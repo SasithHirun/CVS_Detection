@@ -210,9 +210,9 @@
         <div class="controls card">
             <button onclick="resetScreenTime()">Reset Screen Time</button>
             <button onclick="toggleMonitoring()">Stop Monitoring</button>
-            <button onclick="resetScreenTime()">Data Visualizasion</button>
+            <button onclick="window.location.href='/account'">Data Visualization</button>
             <button onclick="toggleMonitoring()">Stop Monitoring</button>
-            
+
         </div>
     </div>
 
@@ -289,24 +289,63 @@
         }
 
         async function updateScreenTime() {
-    try {
-        const response = await fetch('/screen_time');
-        const data = await response.json();
-        screenTimeValue.textContent = data.minutes;
+            try {
+                const response = await fetch('/screen_time');
+                const data = await response.json();
+                screenTimeValue.textContent = data.minutes;
 
-        if (data.minutes >= 2) {
-            popup.innerHTML = `
+                if (data.minutes >= 2) {
+                    popup.innerHTML = `
                 <p>You have been using the screen for 20 minutes. Consider taking a break!</p>
                 <img src="{{ url_for('static', filename='images/20.jpg') }}" alt="Image" style="width:100%; border-radius: 10px; margin-top: 10px;">
-                <button onclick="closePopup()">Close</button>
+                <p id="timer">Time remaining: 20 seconds</p>
+                <button onclick="closePopup(true)">Close</button>
             `;
-            popup.style.display = 'block';
-            overlay.style.display = 'block';
+                    popup.style.display = 'block';
+                    overlay.style.display = 'block';
+
+                    let timeRemaining = 20;
+                    let popupClosedManually = false;
+                    const timerElement = document.getElementById('timer');
+
+                    // Countdown function
+                    const countdown = setInterval(() => {
+                        timeRemaining--;
+                        timerElement.textContent = `Time remaining: ${timeRemaining} seconds`;
+
+                        if (timeRemaining <= 0) {
+                            clearInterval(countdown);  // Stop the countdown
+                            if (!popupClosedManually) {
+                                showCongratulations(); // Show congratulations if not closed manually
+                            }
+                        }
+                    }, 1000);  // Update every 1 second
+
+                    function closePopup(closedManually = false) {
+                        popupClosedManually = closedManually;
+                        popup.style.display = 'none';
+                        overlay.style.display = 'none';
+                    }
+
+                    function showCongratulations() {
+                        popup.innerHTML = `
+                    <p>Congratulations! You earned 10💴 points.</p>
+                    <button onclick="closePopup(true)">Close</button>
+                `;
+                        popup.style.display = 'block';
+                        overlay.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching screen time:', error);
+            }
         }
-    } catch (error) {
-        console.error('Error fetching screen time:', error);
-    }
-}
+
+
+        function closePopup() {
+            popup.style.display = 'none';
+            overlay.style.display = 'none';
+        }
 
 
         videoFeed.onload = () => {
